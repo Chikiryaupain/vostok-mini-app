@@ -1,0 +1,454 @@
+const app = document.querySelector('#app');
+const telegram = window.Telegram?.WebApp;
+const inTelegram = Boolean(telegram?.initData);
+const telegramUser = telegram?.initDataUnsafe?.user?.id;
+const storageKey = 'vostok-quest.v1' + (telegramUser ? '.' + telegramUser : '');
+const total = quest.sectors.length;
+const fresh = () => ({ started: false, opened: 0, pending: false, rewarded: false });
+let progress = load();
+let screen = initialScreen();
+let selected = Math.min(progress.opened, total - 1);
+let code = '';
+
+function load() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey));
+    if (!saved || !Number.isInteger(saved.opened) || saved.opened < 0 || saved.opened > total) return fresh();
+    return {
+      opened: saved.opened,
+      started: saved.started === true || saved.opened > 0 || saved.pending === true,
+      pending: saved.pending === true && saved.opened < total,
+      rewarded: saved.rewarded === true && saved.opened === total,
+    };
+  } catch {
+    return fresh();
+  }
+}
+
+function save() {
+  try { localStorage.setItem(storageKey, JSON.stringify(progress)); } catch { /* Текущий сеанс продолжится в памяти. */ }
+}
+
+function initialScreen() {
+  if (progress.rewarded) return 'reward';
+  if (progress.pending) return 'confirmed';
+  if (progress.opened === total) return 'mission';
+  return progress.started ? 'map' : 'welcome';
+}
+
+const number = value => String(value).padStart(2, '0');
+const sectorStatus = index => index < progress.opened ? 'opened' : index === progress.opened ? 'active' : 'locked';
+const go = (next, focus = true) => {
+  screen = next;
+  render();
+  window.scrollTo(0, 0);
+  if (focus) app.querySelector('h1')?.focus({ preventScroll: true });
+};
+
+function back() {
+  switch (screen) {
+    case 'briefing': go('welcome'); break;
+    case 'instructions': go('briefing'); break;
+    case 'map': go(progress.opened ? 'welcome' : 'instructions'); break;
+    case 'code': go('map'); break;
+    case 'incorrect': go('code'); break;
+    case 'confirmed': go('map'); break;
+    case 'unlocked':
+    case 'assembly':
+    case 'mission': go('map'); break;
+    case 'reward': go('mission'); break;
+  }
+}
+
+const button = (label, action, type = 'primary') =>
+  `<button class="button ${type}" type="button" data-action="${action}">${label}</button>`;
+const title = (text, className = '') => `<h1 tabindex="-1" class="${className}">${text}</h1>`;
+const brand = '<img class="brand" src="./assets/brand.png" alt="Arknights Endfield × Музей космонавтики" width="247" height="24">';
+const earth = `<div class="earth" aria-hidden="true"></div>`;
+const avatar = '<img class="avatar" src="./assets/avatar.png" width="82" height="82" alt="">';
+
+function mapArt() {
+  const { halls, control } = quest.map;
+  const [cx, cy] = control;
+
+
+  // Keep the same scale as the entrance annotation appears or disappears.
+  const mapViewBox = progress.opened === 0 ? '-6.5 -10 362 485' : '-2.5 -20.5 362 485';
+  return `<svg class="floorplan" viewBox="${mapViewBox}" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Секторы музея">
+    <defs>
+      <pattern id="fog" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#161614"/><path d="M0 0V5" stroke="#24241f" stroke-width="1"/></pattern>
+    </defs>
+    <path class="hall-links" aria-hidden="true" d="M79 380V414 M129 301H148 M180 320V340 M212 357H226V249L204 227 M82 161V141 M117 105H143 M215 105H244 M282 153V178 M216 218H241 M282 69V47"/>
+    <g>
+      ${quest.sectors.map(({ id, hall }, index) => {
+        const [points, x, y] = halls[id];
+        const status = sectorStatus(index);
+        const labels = { active: 'текущий сектор', opened: 'открыт', locked: 'в тумане' };
+        return `<g class="room ${status} ${index === selected ? 'selected' : ''}" role="button"
+          tabindex="0" aria-pressed="${index === selected}" data-action="select:${index}"
+          aria-label="Сектор ${id}, ${hall}, ${labels[status]}">
+          <polygon points="${points}"/>
+          <g transform="translate(${x},${y})" aria-hidden="true">
+            ${status === 'locked'
+              ? '<path class="lock" d="M-5 -2h10v9h-10z M-3 -2v-3a3 3 0 0 1 6 0v3"/>'
+              : `<text class="room-number" text-anchor="middle" y="${index === 0 ? 10 : 6}">${id}</text>`}
+          </g>
+        </g>`;
+      }).join('')}
+      <g transform="translate(${cx},${cy})" aria-hidden="true">
+        <rect class="control-tag" x="-27" y="-8" width="54" height="17"/>
+        <text class="control-text" text-anchor="middle" y="4">ЦУП</text>
+      </g>
+      ${progress.opened === 0 ? `<g aria-hidden="true">
+        <path class="entrance-route" d="M79 414H30"/>
+        <circle class="entrance-dot" cx="30" cy="414" r="6"/>
+        <text class="entrance-text" x="43" y="433">ВХОД · ТЫ ЗДЕСЬ</text>
+      </g>` : ''}
+    </g>
+  </svg>`;
+}
+
+function mapScreen() {
+  const current = quest.sectors[selected];
+  const status = sectorStatus(selected);
+  const allOpen = progress.opened === total;
+  const action = allOpen ? 'mission' : status === 'active' ? 'enter-code' : 'active-sector';
+  const label = allOpen ? 'Перейти в ЦУП' : status === 'active' ? 'Ввести код' : 'К текущему сектору';
+  const detail = allOpen ? 'Маршрут завершён. Финал в ЦУП.'
+    : status === 'opened' ? 'Сектор открыт' : status === 'locked' ? 'Сектор в тумане' : 'Текущий сектор';
+  return `<section class="screen map-screen">
+    <div class="map-top">
+      <div>${title('Карта музея', 'mono map-title')}<p class="counter" aria-label="Открыто ${progress.opened} из ${total} секторов">${number(Math.min(progress.opened + 1, total))}<span>/${number(total)}</span></p></div>
+      ${button('Сборка ↗', 'assembly', 'ghost compact')}
+    </div>
+    <div class="map-art">${mapArt()}</div>
+    <div class="map-info">
+      <div class="eyebrow mono">${detail}</div>
+      <p>${allOpen ? 'Центр управления полётами' : 'Сектор ' + current.id + ' · ' + current.hall}</p>
+    </div>
+    <div class="actions">${button(label, action)}</div>
+  </section>`;
+}
+
+function codeScreen() {
+  const sector = quest.sectors[progress.opened];
+  return `<section class="screen code-screen">
+    <div class="card guide">
+      <div class="eyebrow mono">Проводник</div>
+      <h2 class="display">Ивонна</h2>
+      <p>Найди метку на табличке рядом с экспонатом и введи четыре цифры. Если ошибёшься, попробуй ещё раз — попытки не ограничены.</p>
+      ${avatar}
+    </div>
+    <form id="code-form" class="code-form">
+      <div class="card assignment">
+        <div class="eyebrow mono">Регистратор данных</div>
+        ${title('Сектор ' + sector.id.padStart(3, '0'))}
+        <p>${sector.clue}</p>
+      </div>
+      <div class="card code-entry">
+        <label class="visually-hidden" for="code">Код с таблички</label>
+        <div class="code-field">
+          <div class="code-slots" aria-hidden="true">${Array.from({ length: 4 }, (_, index) => `<span style="--order:${index}"><b>0</b></span>`).join('')}</div>
+          <input id="code" name="code" type="text" inputmode="numeric" maxlength="4"
+            pattern="[0-9]{4}" autocomplete="off" enterkeyhint="done" required>
+        </div>
+        <button class="button primary" type="submit" disabled>Подтвердить</button>
+      </div>
+    </form>
+  </section>`;
+}
+
+function statusScreen(kind) {
+  const sector = quest.sectors[progress.opened - 1];
+  const messages = {
+    confirmed: { title: 'Данные успешно подтверждены',
+      body: 'Код с таблички подошёл. Открой сектор, чтобы получить ещё одну деталь «Востока».', button: 'Открыть сектор', action: 'unlock' },
+    incorrect: { title: 'Этот код<br>не подошёл',
+      body: 'Проверь цифры на табличке<br>рядом с нужным экспонатом<br>и попробуй ввести код снова.', button: 'Попробовать ещё раз', action: 'retry' },
+    unlocked: { tag: 'Новая область', title: 'Сектор открыт',
+      body: `Ты получил деталь ракеты:<br>«${sector?.part}».<br>Следующий сектор — на карте.`,
+      button: 'Продолжить', action: progress.opened === total ? 'mission' : 'next-sector' },
+    mission: { tag: 'Оператор, отличная работа!', title: 'Миссия успешно выполнена!',
+      body: 'Ты собрал все восемь деталей «Востока». Отправляйся в ЦУП за наградой.',
+      button: 'Получить награду', action: 'claim' },
+  };
+  const result = messages[kind];
+  const hasStripes = kind === 'confirmed' || kind === 'unlocked';
+  const footer = kind === 'mission' ? '100% прогресс' : 'Можно повторить';
+  return `<section class="screen result ${kind}">
+    ${result.tag ? `<div class="eyebrow mono result-tag">${result.tag}</div>` : ''}
+    <div class="result-center">
+      <div class="status-icon" aria-hidden="true">
+        <svg class="sector-diamonds" viewBox="0 0 320 214" fill="none" aria-hidden="true">
+          <g id="sector-rings"><path class="diamond-outer" pathLength="100" d="M160 3 264 107 160 211 56 107Z" stroke="#536f92" stroke-dasharray="6 1 .4 1"/>
+          <path class="diamond-middle" pathLength="100" d="M160 23 244 107 160 191 76 107Z" stroke="#456994"/>
+          <g class="diamond-light"><path pathLength="100" d="M160 35 232 107 160 179 88 107Z" stroke="#bbdfff" stroke-width="2.5" stroke-linejoin="round"/></g>
+          <path class="diamond-accents" d="m151 36 9-9 9 9m62 62 9 9-9 9m-62 62-9 9-9-9m-62-62-9-9 9-9" stroke="#78b9eb" stroke-width="2"/>
+        </g>
+        </svg><svg class="unlock-symbol" viewBox="0 0 100 100" aria-hidden="true">
+          ${kind === 'mission' ? `<g fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round">
+            <path d="M29 26H15v8q0 17 21 18m35-26h14v8q0 17-21 18"/>
+            <path d="M28 20h44l-3 23q-3 17-19 21-16-4-19-21Z" fill="currentColor"/>
+            <path d="M50 62v14m-14 5h28l-6-6H42Z"/>
+          </g>` : kind === 'unlocked' ? `<path d="M34 51V34a16 16 0 0 1 32 0v17" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+          <rect x="24" y="48" width="52" height="38" rx="8" fill="currentColor"/>
+          <path d="M50 61v10" stroke="#12232b" stroke-width="6" stroke-linecap="round"/>` : `<path d="${kind === 'confirmed' ? 'M20 51l20 20 40-43' : 'M27 27l46 46M73 27L27 73'}" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>`}
+        </svg>
+      </div>
+      ${title(result.title)}
+      <p>${result.body}</p>
+    </div>
+    <div class="actions">
+      <p class="eyebrow mono result-footer">${hasStripes ? `<svg class="credit-stripes" width="68" height="16" viewBox="0 0 42.5 10" fill="currentColor" aria-hidden="true">
+        <path d="M7.5 0 0 10h8l7.5-10Z"/><path d="M21 0l-7.5 10h8L29 0Z"/><path d="M34.5 0 27 10h8l7.5-10Z"/>
+      </svg><span class="sector-credit">${kind === 'confirmed' ? 'Доступ разрешён' : '<b>+1</b> сектор'}</span>` : `<span>${footer}</span>`}</p>
+      ${button(result.button, result.action)}
+    </div>
+  </section>`;
+}
+
+function assemblyScreen() {
+  return `<section class="screen assembly">
+    <div class="card assembly-header">
+      <div class="eyebrow mono">Детали ${number(progress.opened)} / ${number(total)}</div>
+      ${title('Сборка ракеты')}
+    <div role="progressbar" aria-label="Сборка ракеты" aria-valuenow="${progress.opened}" aria-valuemin="0" aria-valuemax="${total}" class="assembly-meter">
+      ${quest.sectors.map((_, index) => `<span class="${index < progress.opened ? 'collected' : ''}"></span>`).join('')}
+    </div>
+    </div>
+    <ol class="parts">
+      ${quest.sectors.map(({ id, part }, index) => {
+        const found = index < progress.opened;
+        return `<li class="card ${found ? 'collected' : 'locked'}"><small class="eyebrow mono">Сектор ${id}</small>
+          <strong>${found ? part : 'Под замком'}</strong>
+          <span class="part-caption">${found ? '✓ Получена' : 'Открой сектор ' + id}</span></li>`;
+      }).join('')}
+    </ol>
+    <div class="actions">${button('Вернуться к карте', 'map')}</div>
+  </section>`;
+}
+
+const views = {
+  welcome: () => `<section class="screen welcome">
+    <div class="hero">${title('<span class="operation-label">Операция</span> «Восток»', 'display')}</div>
+    <div class="welcome-intro">
+      <p>Пройди залы музея, найди коды у экспонатов и собери ракету к старту.</p>
+      ${button(progress.rewarded ? 'К награде' : progress.started ? 'Продолжить квест' : 'Отправиться в путь', 'start')}
+    </div>
+  </section>`,
+  briefing: () => `<section class="screen briefing">
+    ${earth}
+    <div class="card briefing-card">
+      <div class="eyebrow mono">Новое задание</div>
+      ${title('Исследовательская<br>операция: космос')}
+      <p>Вам предстоит отправиться в исследовательскую экспедицию по Музею космонавтики. Изучайте экспонаты, собирайте данные и открывайте новые секторы.</p>
+    </div>
+    <div class="actions">${button('Начать путешествие', 'instructions')}</div>
+  </section>`,
+  instructions: () => `<section class="screen instructions">
+    <div class="card guide">
+      <div class="eyebrow mono">Проводник</div>
+      ${title('Ивонна', 'display')}
+      <p>Для прохождения миссии перемещайся по музею и внимательно изучай экспонаты. Правильный ответ откроет следующий сектор.</p>
+      ${avatar}
+    </div>
+    <div class="card instructions-card">
+      <h2 class="eyebrow mono">Цели операции <img src="./assets/stripes.svg" alt=""></h2>
+      <ol>
+        <li><span>Найди открытый сектор на карте и нажми на область</span></li>
+        <li>Отыщи метку «Датаграма» у экспоната — код на табличке</li>
+        <li>Введи код: сектор откроется, а ты получишь деталь ракеты</li>
+      </ol>
+      <p>Собери все 8 деталей ракеты и приходи в ЦУП — там старт квеста и выдача призов</p>
+    </div>
+    <div class="actions">${button('Принять задание', 'begin')}</div>
+  </section>`,
+  map: mapScreen,
+  code: codeScreen,
+  confirmed: () => statusScreen('confirmed'),
+  incorrect: () => statusScreen('incorrect'),
+  unlocked: () => statusScreen('unlocked'),
+  mission: () => statusScreen('mission'),
+  reward: () => `<section class="screen briefing">
+    ${earth}
+    <div class="card briefing-card">
+      <div class="eyebrow mono">Награда разблокирована</div>
+      ${title('Поздравляем<br>с успешным<br>прохождением!')}
+      <p>Тебя ждёт <span class="reward-name">памятный подарок коллаборации</span>. ${quest.reward}</p>
+    </div>
+    <div class="actions">
+      ${button('Закончить путешествие', 'finish')}
+    </div>
+  </section>`,
+  assembly: assemblyScreen,
+};
+
+function bindShortWords(text) {
+  return text
+    .replace(/([\p{L}\p{N}]+) +(?=\S)/gu, (match, word) =>
+      /^(а|и|к|в|с|у|о|на|из|за|от|до|по|во|со|об|ко|не|но|без|для)$/iu.test(word) ? word + '\u00a0' : match)
+    .replace(/(сектор|секторе|блок|№) +(?=\d|[А-ЯЁ](?!\p{L}))/giu, '$1\u00a0')
+    .replace(/ +(?=[—·])/gu, '\u00a0');
+}
+
+function render(animate = true) {
+  app.innerHTML = `<div class="app-shell" data-screen="${screen}" ${animate ? 'data-enter' : ''}>
+    <header>${brand}${screen !== 'welcome' && !inTelegram ? button('←', 'back', 'back ghost') : ''}</header>
+    <div class="screen-scroll">${views[screen]()}</div>
+    <div class="primary-dock"></div>
+    <div class="test-controls">
+      <button type="button" data-action="restart">Перезагрузить</button>
+    </div>
+  </div>`;
+  const primary = app.querySelector('.screen .button.primary');
+
+  if (primary.type !== 'submit') app.querySelector('.primary-dock').append(primary);
+  const words = document.createTreeWalker(app, NodeFilter.SHOW_TEXT);
+  while (words.nextNode()) {
+    const node = words.currentNode;
+    node.data = bindShortWords(node.data);
+  }
+  app.querySelector('[data-action="back"]')?.setAttribute('aria-label', 'Назад');
+  if (inTelegram && telegram.isVersionAtLeast?.('6.1')) {
+    if (screen === 'welcome') telegram.BackButton.hide();
+    else telegram.BackButton.show();
+  }
+  if (screen === 'code') syncCode();
+}
+
+function syncCode() {
+  const field = app.querySelector('#code');
+  if (field.value !== code) field.value = code;
+  const row = field.parentElement;
+  row.style.setProperty('--cursor', Math.min(code.length, 3));
+  row.classList.toggle('complete', code.length === 4);
+  row.querySelectorAll('.code-slots b').forEach((digit, index) => {
+    const value = code[index] || '';
+    if ((digit.dataset.value || '') === value) return;
+    digit.dataset.value = value;
+    digit.textContent = value || '0';
+    digit.animate([{ opacity: 0, transform: 'translateY(45%)' }, { opacity: 1, transform: 'none' }], { duration: 150, easing: 'ease-out' });
+  });
+  app.querySelector('#code-form button[type="submit"]').disabled = code.length !== 4;
+}
+
+function haptic(type) {
+  if (inTelegram && telegram.isVersionAtLeast?.('6.1')) telegram.HapticFeedback.notificationOccurred(type);
+}
+
+function restart() {
+  progress = fresh();
+  selected = 0;
+  code = '';
+  save();
+  go('welcome');
+}
+
+function handleAction(action) {
+  if (action.startsWith('select:')) {
+    selected = Number(action.split(':')[1]);
+    render(false);
+    app.querySelector(`[data-action="${action}"]`)?.focus({ preventScroll: true });
+    return;
+  }
+  switch (action) {
+    case 'start': go(progress.started ? initialScreen() : 'briefing'); break;
+    case 'begin':
+      progress.started = true;
+      save();
+      go('map');
+      break;
+    case 'enter-code':
+      if (progress.opened === total) break;
+      if (progress.pending) { go('confirmed'); break; }
+      code = '';
+      go('code');
+      break;
+    case 'retry':
+      code = '';
+      go('code');
+      break;
+    case 'unlock':
+      if (!progress.pending || progress.opened === total) break;
+      progress.opened += 1;
+      progress.pending = false;
+      selected = progress.opened - 1;
+      save();
+      haptic('success');
+      go(progress.opened === total ? 'mission' : 'unlocked');
+      break;
+    case 'next-sector':
+    case 'active-sector':
+      selected = Math.min(progress.opened, total - 1);
+      go('map');
+      break;
+    case 'mission':
+      if (progress.opened === total) go('mission');
+      break;
+    case 'claim':
+      if (progress.opened !== total) break;
+      progress.rewarded = true;
+      save();
+      go('reward');
+      break;
+    case 'finish': go('welcome'); break;
+    case 'restart':
+      if (inTelegram && telegram.isVersionAtLeast?.('6.2')) {
+        telegram.showConfirm('Начать заново и сбросить прогресс?', ok => { if (ok) restart(); });
+      } else if (window.confirm('Начать заново и сбросить прогресс?')) restart();
+      break;
+    case 'back': back(); break;
+    case 'map':
+    case 'assembly':
+    case 'instructions': go(action); break;
+  }
+}
+
+app.addEventListener('click', event => {
+  const action = event.target.closest('[data-action]')?.dataset.action;
+  if (action) handleAction(action);
+});
+
+app.addEventListener('keydown', event => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const room = event.target.closest('.room');
+  if (!room) return;
+  event.preventDefault();
+  handleAction(room.dataset.action);
+});
+
+app.addEventListener('input', event => {
+  if (event.target.id !== 'code') return;
+  code = event.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+  syncCode();
+});
+
+app.addEventListener('submit', event => {
+  if (event.target.id !== 'code-form') return;
+  event.preventDefault();
+  if (screen !== 'code' || progress.opened >= total || code.length !== 4) return;
+  if (code === quest.sectors[progress.opened].code) {
+    progress.pending = true;
+    save();
+    go('confirmed');
+  } else {
+    haptic('error');
+    const form = event.target;
+    if (form.classList.contains('rejecting')) return;
+    form.classList.add('rejecting');
+    form.elements.code.readOnly = true;
+    form.querySelector('button').disabled = true;
+    setTimeout(() => { if (form.isConnected) go('incorrect'); }, 420);
+  }
+});
+
+if (inTelegram) {
+  telegram.expand();
+  if (telegram.isVersionAtLeast?.('6.1')) {
+    telegram.BackButton.onClick(back);
+    telegram.setHeaderColor(telegram.isVersionAtLeast('6.9') ? '#0d0d0c' : 'bg_color');
+    telegram.setBackgroundColor('#0d0d0c');
+  }
+}
+render();
+if (inTelegram) telegram.ready();
