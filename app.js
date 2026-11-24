@@ -154,7 +154,7 @@ function codeScreen() {
     <form id="code-form" class="code-form">
       <div class="card assignment">
         <div class="eyebrow mono">Регистратор данных</div>
-        ${title('Сектор ' + sector.id.padStart(3, '0'))}
+        ${title('Сектор <strong class="sector-id">' + sector.id.padStart(3, '0') + '</strong>')}
         <p>${sector.clue}</p>
       </div>
       <div class="card code-entry">
@@ -186,7 +186,7 @@ function statusScreen(kind) {
   };
   const result = messages[kind];
   const hasStripes = kind === 'confirmed' || kind === 'unlocked';
-  const footer = kind === 'mission' ? '100% прогресс' : 'Можно повторить';
+  const footer = kind === 'mission' ? '<b>100%</b> прогресс' : 'Можно повторить';
   return `<section class="screen result ${kind}">
     ${result.tag ? `<div class="eyebrow mono result-tag">${result.tag}</div>` : ''}
     <div class="result-center">
@@ -213,7 +213,7 @@ function statusScreen(kind) {
     <div class="actions">
       <p class="eyebrow mono result-footer">${hasStripes ? `<svg class="credit-stripes" width="51" height="12" viewBox="0 0 42.5 10" fill="currentColor" aria-hidden="true">
         <path d="M7.5 0 0 10h8l7.5-10Z"/><path d="M21 0l-7.5 10h8L29 0Z"/><path d="M34.5 0 27 10h8l7.5-10Z"/>
-      </svg><span class="sector-credit">${kind === 'confirmed' ? 'Доступ разрешён' : '<b>+1</b> сектор'}</span>` : `<span>${footer}</span>`}</p>
+      </svg><span class="sector-credit">${kind === 'confirmed' ? 'Доступ разрешён' : '<b>+1</b> сектор'}</span>` : `<span class="sector-credit">${footer}</span>`}</p>
       ${button(result.button, result.action)}
     </div>
   </section>`;
@@ -222,7 +222,10 @@ function statusScreen(kind) {
 function assemblyScreen() {
   return `<section class="screen assembly">
     <div class="card assembly-header">
-      <div class="eyebrow mono">Детали ${number(progress.opened)} / ${number(total)}</div>
+      <div class="assembly-count">
+        <span class="eyebrow mono">Детали</span>
+        <span class="part-total"><strong>${number(progress.opened)}</strong> / ${number(total)}</span>
+      </div>
       ${title('Сборка ракеты')}
     <div role="progressbar" aria-label="Сборка ракеты" aria-valuenow="${progress.opened}" aria-valuemin="0" aria-valuemax="${total}" class="assembly-meter">
       ${quest.sectors.map((_, index) => `<span class="${index < progress.opened ? 'collected' : ''}"></span>`).join('')}
@@ -233,7 +236,7 @@ function assemblyScreen() {
         const found = index < progress.opened;
         return `<li class="card ${found ? 'collected' : 'locked'}"><small class="eyebrow mono">Сектор ${id}</small>
           <strong>${found ? part : 'Под замком'}</strong>
-          <span class="part-caption">${found ? '✓ Получена' : 'Открой сектор ' + id}</span></li>`;
+          <span class="part-caption">${found ? '<span class="part-check" aria-hidden="true">✓</span> Получена' : 'Открой сектор ' + id}</span></li>`;
       }).join('')}
     </ol>
     <div class="actions">${button('Вернуться к карте', 'map')}</div>
@@ -251,7 +254,7 @@ const views = {
   briefing: () => `<section class="screen briefing">
     ${earth}
     <div class="card briefing-card">
-      <div class="eyebrow mono">Новое задание</div>
+      <div class="eyebrow mono mission-label">Новое задание</div>
       ${title('Исследовательская<br>операция: космос')}
       <p>Вам предстоит отправиться в исследовательскую экспедицию по Музею космонавтики. Изучайте экспонаты, собирайте данные и открывайте новые секторы.</p>
     </div>
@@ -284,7 +287,7 @@ const views = {
   reward: () => `<section class="screen briefing">
     ${earth}
     <div class="card briefing-card">
-      <div class="eyebrow mono">Награда разблокирована</div>
+      <div class="eyebrow mono mission-label">Награда разблокирована</div>
       ${title('Поздравляем<br>с успешным<br>прохождением!')}
       <p>Тебя ждёт <span class="reward-name">памятный подарок коллаборации</span>. ${quest.reward}</p>
     </div>
