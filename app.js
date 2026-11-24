@@ -173,20 +173,18 @@ function codeScreen() {
 function statusScreen(kind) {
   const sector = quest.sectors[progress.opened - 1];
   const messages = {
-    confirmed: { title: 'Данные успешно подтверждены',
+    confirmed: { title: 'Данные успешно подтверждены', credit: 'Доступ разрешён',
       body: 'Код с таблички подошёл.<br>Открой сектор, чтобы получить<br>ещё одну деталь «Востока».', button: 'Открыть сектор', action: 'unlock' },
-    incorrect: { title: 'Этот код<br>не подошёл',
+    incorrect: { title: 'Этот код<br>не подошёл', credit: 'Можно повторить',
       body: 'Сверь цифры на табличке<br>рядом с нужным экспонатом<br>и введи код ещё раз.', button: 'Попробовать ещё раз', action: 'retry' },
-    unlocked: { tag: 'Новая область', title: 'Сектор открыт',
+    unlocked: { tag: 'Новая область', title: 'Сектор открыт', credit: '<b>+1</b> сектор',
       body: `Ты получил деталь ракеты:<br>«${sector?.part}».<br>Следующий сектор — на карте.`,
       button: 'Продолжить', action: progress.opened === total ? 'mission' : 'next-sector' },
-    mission: { tag: 'Оператор, отличная работа!', title: 'Миссия успешно выполнена!',
+    mission: { tag: 'Оператор, отличная работа!', title: 'Миссия успешно выполнена!', credit: '<b>100%</b> прогресс',
       body: 'Ты собрал все восемь деталей<br>ракеты «Восток». Забери награду<br>в Центре управления полётами.',
       button: 'Получить награду', action: 'claim' },
   };
   const result = messages[kind];
-  const hasStripes = kind === 'confirmed' || kind === 'unlocked';
-  const footer = kind === 'mission' ? '<b>100%</b> прогресс' : 'Можно повторить';
   return `<section class="screen result ${kind}">
     ${result.tag ? `<div class="eyebrow mono result-tag">${result.tag}</div>` : ''}
     <div class="result-center">
@@ -211,9 +209,9 @@ function statusScreen(kind) {
       <p>${result.body}</p>
     </div>
     <div class="actions">
-      <p class="eyebrow mono result-footer">${hasStripes ? `<svg class="credit-stripes" width="51" height="12" viewBox="0 0 42.5 10" fill="currentColor" aria-hidden="true">
+      <p class="eyebrow mono result-footer">${kind === 'unlocked' ? `<svg class="credit-stripes" width="51" height="12" viewBox="0 0 42.5 10" fill="currentColor" aria-hidden="true">
         <path d="M7.5 0 0 10h8l7.5-10Z"/><path d="M21 0l-7.5 10h8L29 0Z"/><path d="M34.5 0 27 10h8l7.5-10Z"/>
-      </svg><span class="sector-credit">${kind === 'confirmed' ? 'Доступ разрешён' : '<b>+1</b> сектор'}</span>` : `<span class="sector-credit">${footer}</span>`}</p>
+      </svg>` : ''}<span class="sector-credit">${result.credit}</span></p>
       ${button(result.button, result.action)}
     </div>
   </section>`;

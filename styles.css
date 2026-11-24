@@ -445,7 +445,7 @@ html[data-motion="on"] {
   to { transform: scaleX(1); opacity: 1; }
 }
 
-.result:is(.confirmed,.unlocked) .result-footer { width: fit-content; margin-inline: auto; gap: 9px; }
+.result.unlocked .result-footer { width: fit-content; margin-inline: auto; gap: 9px; }
 .credit-stripes { display: block; flex: none; overflow: visible; color: #f3c432; }
 .sector-credit, .incorrect .result-footer span { font-size: 12px; line-height: 1; white-space: nowrap; }
 .sector-credit b { color: var(--yellow); font-size: 15px; }
@@ -533,8 +533,8 @@ html[data-motion="on"] [data-enter] .sector-credit {
 .instructions .instructions-card h2.eyebrow { color: var(--yellow); font: 600 12px/1.35 var(--mono); letter-spacing: .08em; }
 .sector-id { color: var(--yellow); font: 600 1.08em/1 var(--mono); }
 .result-tag { font: 600 12px/1.35 var(--mono); color: var(--mark-color, var(--signal)); }
-.incorrect .sector-credit { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-.incorrect .sector-credit::before {
+.result:is(.confirmed, .incorrect) .sector-credit { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.result:is(.confirmed, .incorrect) .sector-credit::before {
   content: ""; width: 6px; height: 6px;
   background: var(--mark-color); transform: rotate(45deg);
 }
