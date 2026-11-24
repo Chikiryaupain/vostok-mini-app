@@ -9,6 +9,7 @@ let progress = load();
 let screen = initialScreen();
 let selected = Math.min(progress.opened, total - 1);
 let code = '';
+let retryingCode = false;
 let codeScreenHeight = 0;
 
 function load() {
@@ -40,6 +41,8 @@ function initialScreen() {
 const number = value => String(value).padStart(2, '0');
 const sectorStatus = index => index < progress.opened ? 'opened' : index === progress.opened ? 'active' : 'locked';
 const go = (next, focus = true) => {
+  retryingCode = next === 'code' && screen === 'incorrect';
+  if (retryingCode) code = '';
   screen = next;
   render();
   window.scrollTo(0, 0);
@@ -73,17 +76,13 @@ const earth = `<div class="earth" aria-hidden="true"></div>`;
 const avatar = '<img class="avatar" src="./assets/avatar.png" width="82" height="82" alt="">';
 
 function mapArt() {
-  const { halls, control } = quest.map;
-  const [cx, cy] = control;
-
-
-  // Keep the same scale as the entrance annotation appears or disappears.
-  const mapViewBox = progress.opened === 0 ? '-6.5 -10 362 485' : '-2.5 -20.5 362 485';
-  return `<svg class="floorplan" viewBox="${mapViewBox}" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Секторы музея">
+  const { halls, links } = quest.map;
+  return `<svg class="floorplan" viewBox="0 0 445 698" preserveAspectRatio="xMidYMid meet" role="group" aria-label="Секторы музея">
     <defs>
       <pattern id="fog" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="#161614"/><path d="M0 0V5" stroke="#24241f" stroke-width="1"/></pattern>
     </defs>
-    <path class="hall-links" aria-hidden="true" d="M79 380V414 M129 301H148 M180 320V340 M212 357H226V249L204 227 M82 161V141 M117 105H143 M215 105H244 M282 153V178 M216 218H241 M282 69V47"/>
+    <g aria-hidden="true">${links.map((d, index) =>
+      `<path class="hall-links${index < progress.opened ? ' traversed' : ''}" d="${d}"/>`).join('')}</g>
     <g>
       ${quest.sectors.map(({ id, hall }, index) => {
         const [points, x, y] = halls[id];
@@ -94,20 +93,21 @@ function mapArt() {
           aria-label="Сектор ${id}, ${hall}, ${labels[status]}">
           <polygon points="${points}"/>
           <g transform="translate(${x},${y})" aria-hidden="true">
-            ${status === 'locked'
-              ? '<path class="lock" d="M-5 -2h10v9h-10z M-3 -2v-3a3 3 0 0 1 6 0v3"/>'
-              : `<text class="room-number" text-anchor="middle" y="${index === 0 ? 10 : 6}">${id}</text>`}
+            <text class="room-number" text-anchor="middle" y="${status === 'locked' ? -5 : 7}">${id}</text>
+            ${status === 'locked' ? '<path class="lock" transform="translate(0 11)" d="M-5 -2h10v9h-10z M-3 -2v-3a3 3 0 0 1 6 0v3"/>' : ''}
           </g>
         </g>`;
       }).join('')}
-      <g transform="translate(${cx},${cy})" aria-hidden="true">
-        <rect class="control-tag" x="-27" y="-8" width="54" height="17"/>
-        <text class="control-text" text-anchor="middle" y="4">ЦУП</text>
+      <g aria-hidden="true">
+        <rect class="control-tag" x="278" y="100" width="32" height="83" stroke-dasharray="4 3"/>
+        <text class="control-text" text-anchor="middle" transform="translate(294 142) rotate(-90)" y="4">ЦУП</text>
+        <rect class="control-tag" x="312" y="23" width="84" height="24"/>
+        <text class="control-text" text-anchor="middle" x="354" y="40">ФИНИШ</text>
       </g>
       ${progress.opened === 0 ? `<g aria-hidden="true">
-        <path class="entrance-route" d="M79 414H30"/>
-        <circle class="entrance-dot" cx="30" cy="414" r="6"/>
-        <text class="entrance-text" x="43" y="433">ВХОД · ТЫ ЗДЕСЬ</text>
+        <path class="entrance-route" d="M75 652V670H39"/>
+        <circle class="entrance-dot" cx="39" cy="670" r="5"/>
+        <text class="entrance-text" x="52" y="684">ВХОД · ТЫ ЗДЕСЬ</text>
       </g>` : ''}
     </g>
   </svg>`;
@@ -148,7 +148,7 @@ function codeScreen() {
     <div class="card guide">
       <div class="eyebrow mono">Проводник</div>
       <h2 class="display">Ивонна</h2>
-      <p>Найди метку на табличке рядом с экспонатом и введи четыре цифры. Если ошибёшься, попробуй ещё раз — попытки не ограничены.</p>
+      <p>${retryingCode ? 'Посмотри на табличку ещё раз. Все четыре цифры стоят в том же порядке? Попытки не ограничены.' : sector.guide}</p>
       ${avatar}
     </div>
     <form id="code-form" class="code-form">
