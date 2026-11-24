@@ -58,11 +58,32 @@ button { cursor: pointer; touch-action: manipulation; }
   margin-inline: auto;
   padding: max(8px, var(--safe-top)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + var(--safe-bottom)) max(16px, env(safe-area-inset-left, 0px));
   background-color: var(--background);
+  isolation: isolate;
+  overflow: clip;
+}
+.app-shell[data-screen="welcome"] {
   background-image: url("./assets/texture.webp");
   background-size: auto max(100%, 714px);
   background-position: center top;
   background-blend-mode: multiply;
-  overflow: clip;
+}
+.app-shell:not([data-screen="welcome"])::before,
+.app-shell:not([data-screen="welcome"])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.app-shell:not([data-screen="welcome"])::before {
+  z-index: -2;
+  background: url("./assets/topography.svg") 49% 48% / auto 111% no-repeat;
+  opacity: .06;
+  mask-image: linear-gradient(180deg, transparent 0%, #0002 15%, #000 27%, #000 72%, #0003 85%, #0002 100%);
+}
+.app-shell:not([data-screen="welcome"])::after {
+  z-index: -1;
+  background: linear-gradient(180deg, #0d0d0cc2 0%, transparent 21%, transparent 64%, #0d0d0ca8 96%),
+    radial-gradient(ellipse 44% 51% at 50% 48%, var(--background) 12%, #0d0d0ca8 73%, transparent);
 }
 
 header {
@@ -188,20 +209,40 @@ header {
   font: 700 11px/1 var(--mono);
 }
 
-.map-screen { gap: 18px; padding-top: 14px; }
+.app-shell[data-screen="map"] {
+  padding-top: max(12px, var(--safe-top));
+  padding-bottom: calc(18px + var(--safe-bottom));
+  --map-gap: 11px;
+  --map-toolbar: 66px;
+}
+.app-shell[data-screen="map"] header { min-height: 48px; margin-bottom: var(--map-gap); }
+.app-shell[data-screen="map"] .primary-dock { padding-top: var(--map-gap); }
+.map-screen { gap: var(--map-gap); padding-inline: 2px; }
 .map-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.map-title { letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.counter { font-family: var(--mono); font-weight: 600; margin-top: 5px; }
-.counter span { color: var(--muted); }
+.map-title { font: 600 12px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: #c0c3b8; }
+.counter { display: flex; align-items: center; gap: 9px; font: 600 18px/1 var(--mono); margin-top: 7px; }
+.counter img { width: 15px; height: auto; }
+.counter-total { color: #a8aaa2; }
+.sector-sequence { display: inline-flex; gap: 3px; margin-left: 3px; }
+.sector-sequence i { width: 4px; height: 5px; background: #43473e; }
+.sector-sequence .opened { background: #aeb1a5; }
+.sector-sequence .active { background: var(--yellow); }
 .map-art {
-  display: grid;
-  place-items: center;
-  min-height: 295px;
-  overflow: hidden;
-  border: 1px solid #34352f;
-  border-radius: 14px;
-  margin-top: 4px;
-  background: linear-gradient(#131411 1px,transparent 1px), linear-gradient(90deg,#131411 1px,transparent 1px), #0b0c0b; background-size: 20px 20px;
+  position: relative;
+  min-height: 0;
+  border: 1px solid #454a3d99;
+  background: linear-gradient(#555b481c 1px, transparent 1px), linear-gradient(90deg, #555b481c 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.map-corners {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border: 1px solid #a4a896;
+  mask: linear-gradient(black, black) top left, linear-gradient(black, black) top right,
+    linear-gradient(black, black) bottom left, linear-gradient(black, black) bottom right;
+  mask-size: 13px 13px;
+  mask-repeat: no-repeat;
 }
 .floorplan { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hall-links { fill: none; stroke: #69695a; stroke-width: 2; stroke-linejoin: round; }
@@ -224,10 +265,12 @@ header {
 .entrance-dot { fill: white; stroke: #62625c; stroke-width: 3; }
 .entrance-text { font: 700 10px var(--mono); letter-spacing: .065em; }
 .entrance-text { fill: #fff; }
-.map-info { padding-top: 5px; }
-.map-info p, .counter { font-size: 18px; line-height: 1.25; }
-.map-info .eyebrow, .map-title { font-size: 12px; }
-.map-info .eyebrow { color: #858585; font-weight: 500; margin-bottom: 5px; }
+.map-info { padding: 8px 0 3px; }
+.map-caption { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.map-caption img { width: 65px; height: 7px; opacity: .57; }
+.map-caption .eyebrow { color: #bec1b5; font: 600 11px/1.2 var(--mono); letter-spacing: .1em; }
+.map-caption strong { font: inherit; color: var(--yellow); }
+.map-info h2 { margin-top: 9px; font: 400 clamp(29px, 9vw, 39px)/.97 var(--display); letter-spacing: .01em; text-transform: uppercase; }
 
 .code-form { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .assignment { display: grid; gap: 9px; }
@@ -463,8 +506,7 @@ html[data-motion="on"] [data-enter] .sector-credit {
 .screen-scroll > .briefing { display: grid; grid-template-rows: minmax(100px, 1fr) auto; }
 .briefing .earth { min-height: 0; aspect-ratio: auto; }
 .briefing .briefing-card { flex: none; }
-.screen-scroll > .map-screen { display: grid; grid-template-rows: auto minmax(194px, 1fr) auto; }
-.map-art { position: relative; min-height: 0; }
+.screen-scroll > .map-screen { display: grid; grid-template-rows: var(--map-toolbar) minmax(194px, 1fr) auto; }
 .briefing-card h1 { font-size: 26.8125px; }
 .briefing .briefing-card p { font-size: 16.5px; max-width: none; }
 .screen-scroll {
@@ -487,7 +529,18 @@ html[data-motion="on"] [data-enter] .sector-credit {
   .welcome-intro { margin-inline: -12px; }
 }
 .primary-dock:empty { display: none; }
-.map-top .button.compact { padding-inline: 18px; }
+.map-top .button.compact {
+  display: flex; align-items: center; gap: 13px; padding-inline: 15px;
+  border: 1px solid #575a50; border-radius: 4px; background: #171a16bd;
+  font: 13px var(--button);
+}
+.map-top .compact span { color: #d0d2c6; font: 17px var(--mono); }
+@container (max-height: 755px) {
+  .app-shell[data-screen="map"] header { min-height: 42px; margin-bottom: 9px; }
+  .screen-scroll > .map-screen { --map-gap: 9px; --map-toolbar: 58px; }
+  .map-info h2 { font-size: 30px; }
+  .app-shell[data-screen="map"] .primary-dock { padding-top: 9px; }
+}
 .primary-dock { flex: none; padding-top: 10px; }
 .app-shell header { flex: none; }
 .screen .actions:empty { display: none; }

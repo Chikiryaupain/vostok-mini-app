@@ -120,16 +120,23 @@ function mapScreen() {
   const action = allOpen ? 'mission' : status === 'active' ? 'enter-code' : 'active-sector';
   const label = allOpen ? 'Перейти в ЦУП' : status === 'active' ? 'Ввести код' : 'К текущему сектору';
   const detail = allOpen ? 'Маршрут завершён. Финал в ЦУП.'
-    : status === 'opened' ? 'Сектор открыт' : status === 'locked' ? 'Сектор в тумане' : 'Текущий сектор';
+    : status === 'opened' ? 'Открытый сектор' : status === 'locked' ? 'Закрытый сектор' : 'Текущий сектор';
   return `<section class="screen map-screen">
     <div class="map-top">
-      <div>${title('Карта музея', 'mono map-title')}<p class="counter" aria-label="Открыто ${progress.opened} из ${total} секторов">${number(Math.min(progress.opened + 1, total))}<span>/${number(total)}</span></p></div>
-      ${button('Сборка ↗', 'assembly', 'ghost compact')}
+      <div>
+        ${title('Карта музея', 'mono map-title')}
+        <div class="counter" role="img" aria-label="Открыто ${progress.opened} из ${total} секторов">
+          <img src="./assets/sector-mark.png" alt="">
+          <span>${number(Math.min(progress.opened + 1, total))}<span class="counter-total">/${number(total)}</span></span>
+          <span class="sector-sequence" aria-hidden="true">${quest.sectors.map((_, index) => `<i class="${sectorStatus(index)}"></i>`).join('')}</span>
+        </div>
+      </div>
+      ${button('Сборка <span aria-hidden="true">↗</span>', 'assembly', 'ghost compact')}
     </div>
-    <div class="map-art">${mapArt()}</div>
+    <div class="map-art">${mapArt()}<span class="map-corners" aria-hidden="true"></span></div>
     <div class="map-info">
-      <div class="eyebrow mono">${detail}</div>
-      <p>${allOpen ? 'Центр управления полётами' : 'Сектор ' + current.id + ' · ' + current.hall}</p>
+      <div class="map-caption"><div class="eyebrow mono">${detail}${allOpen ? '' : ` <strong>${current.id}</strong>`}</div><img src="./assets/sector-signal.svg" alt=""></div>
+      <h2>${allOpen ? 'Центр управления полётами' : current.hall.replace(' — ', ' —<br>')}</h2>
     </div>
     <div class="actions">${button(label, action)}</div>
   </section>`;
