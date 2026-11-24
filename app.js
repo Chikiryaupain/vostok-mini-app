@@ -162,14 +162,14 @@ function statusScreen(kind) {
   const sector = quest.sectors[progress.opened - 1];
   const messages = {
     confirmed: { title: 'Данные успешно подтверждены',
-      body: 'Код с таблички подошёл. Открой сектор, чтобы получить ещё одну деталь «Востока».', button: 'Открыть сектор', action: 'unlock' },
+      body: 'Код с таблички подошёл.<br>Открой сектор, чтобы получить<br>ещё одну деталь «Востока».', button: 'Открыть сектор', action: 'unlock' },
     incorrect: { title: 'Этот код<br>не подошёл',
-      body: 'Проверь цифры на табличке<br>рядом с нужным экспонатом<br>и попробуй ввести код снова.', button: 'Попробовать ещё раз', action: 'retry' },
+      body: 'Сверь цифры на табличке<br>рядом с нужным экспонатом<br>и введи код ещё раз.', button: 'Попробовать ещё раз', action: 'retry' },
     unlocked: { tag: 'Новая область', title: 'Сектор открыт',
       body: `Ты получил деталь ракеты:<br>«${sector?.part}».<br>Следующий сектор — на карте.`,
       button: 'Продолжить', action: progress.opened === total ? 'mission' : 'next-sector' },
     mission: { tag: 'Оператор, отличная работа!', title: 'Миссия успешно выполнена!',
-      body: 'Ты собрал все восемь деталей «Востока». Отправляйся в ЦУП за наградой.',
+      body: 'Ты собрал все восемь деталей<br>ракеты «Восток». Забери награду<br>в Центре управления полётами.',
       button: 'Получить награду', action: 'claim' },
   };
   const result = messages[kind];
@@ -199,7 +199,7 @@ function statusScreen(kind) {
       <p>${result.body}</p>
     </div>
     <div class="actions">
-      <p class="eyebrow mono result-footer">${hasStripes ? `<svg class="credit-stripes" width="68" height="16" viewBox="0 0 42.5 10" fill="currentColor" aria-hidden="true">
+      <p class="eyebrow mono result-footer">${hasStripes ? `<svg class="credit-stripes" width="51" height="12" viewBox="0 0 42.5 10" fill="currentColor" aria-hidden="true">
         <path d="M7.5 0 0 10h8l7.5-10Z"/><path d="M21 0l-7.5 10h8L29 0Z"/><path d="M34.5 0 27 10h8l7.5-10Z"/>
       </svg><span class="sector-credit">${kind === 'confirmed' ? 'Доступ разрешён' : '<b>+1</b> сектор'}</span>` : `<span>${footer}</span>`}</p>
       ${button(result.button, result.action)}
@@ -299,14 +299,47 @@ function measureDock(dock) {
   dock.parentElement.style.setProperty('--dock-space', dock.offsetHeight + 'px');
 }
 
+function revealCodeRow() {
+  const input = document.activeElement;
+  if (input?.id !== 'code') return;
+  const scroll = input.closest('.screen-scroll');
+  const row = input.closest('.code-field').getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const top = Math.max(scroll.getBoundingClientRect().top, viewport?.offsetTop ?? 0);
+  const dockTop = app.querySelector('.floating-controls').getBoundingClientRect().top;
+  const bottom = Math.min(dockTop, viewport ? viewport.offsetTop + viewport.height : innerHeight);
+  if (row.bottom > bottom) scroll.scrollTop += Math.ceil(row.bottom - bottom);
+  else if (row.top < top) scroll.scrollTop -= Math.ceil(top - row.top);
+}
+
+const codeViewport = new ResizeObserver(revealCodeRow);
+app.addEventListener('focusin', event => {
+  if (event.target.id !== 'code') return;
+  codeViewport.observe(event.target.closest('.screen-scroll'));
+  window.visualViewport?.addEventListener('scroll', revealCodeRow);
+});
+
+function stopTrackingCodeRow() {
+  codeViewport.disconnect();
+  window.visualViewport?.removeEventListener('scroll', revealCodeRow);
+}
+app.addEventListener('focusout', event => {
+  if (event.target.id === 'code') stopTrackingCodeRow();
+});
+
 function render(animate = true) {
+  stopTrackingCodeRow();
   dockSize.disconnect();
   app.innerHTML = `<div class="app-shell" data-screen="${screen}" ${animate ? 'data-enter' : ''}>
-    <header>${brand}${screen !== 'welcome' && !inTelegram ? button('←', 'back', 'back ghost') : ''}</header>
-    <div class="screen-scroll">${views[screen]()}</div>
+    <div class="screen-scroll">
+      <header>
+        <button class="brand-restart" type="button" data-action="restart" aria-label="Начать квест заново" title="Начать квест заново">${brand}</button>
+        ${screen !== 'welcome' && !inTelegram ? button('←', 'back', 'back ghost') : ''}
+      </header>
+      ${views[screen]()}
+    </div>
     <footer class="floating-controls">
       <div class="primary-dock"></div>
-      <div class="test-controls"><button type="button" data-action="restart">Перезагрузить</button></div>
     </footer>
   </div>`;
   const primary = app.querySelector('.screen .button.primary');
@@ -478,3 +511,9 @@ if (inTelegram) {
 }
 render();
 if (inTelegram) telegram.ready();
+window.addEventListener('load', () => {
+  if (screen !== 'welcome' || navigator.connection?.saveData) return;
+  const nextImage = new Image();
+  nextImage.fetchPriority = 'low';
+  nextImage.src = './assets/orbit.webp';
+}, { once: true });
