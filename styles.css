@@ -1,3 +1,13 @@
+@font-face {
+  font-family: "Bebas Neue Cyrillic";
+  src: url("./assets/fonts/bebasneuecyrillic.ttf") format("truetype");
+  font-display: swap;
+}
+@font-face {
+  font-family: "VCR OSD Mono [RUS by Daymarius]";
+  src: url("./assets/fonts/vcrosdmonorusbydaymarius.ttf") format("truetype");
+  font-display: swap;
+}
 :root {
   color-scheme: dark;
   --background: #0d0d0c;
@@ -7,7 +17,7 @@
   --muted: #b4b4b4;
   --yellow: #ffe500;
   --body: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-  --mono: "SF Mono", SFMono-Regular, ui-monospace, Consolas, monospace;
+  --mono: "SF Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
   --button: "VCR OSD Mono [RUS by Daymarius]", var(--mono);
   --display: "Bebas Neue Cyrillic", Oswald, "Arial Narrow", Impact, sans-serif;
   --safe-top: max(env(safe-area-inset-top, 0px), var(--tg-content-safe-area-inset-top, 0px));
@@ -39,11 +49,11 @@ button { cursor: pointer; touch-action: manipulation; }
 
 .app-shell {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template: auto minmax(0, 1fr) / minmax(0, 1fr);
   width: min(100%, 450px);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: var(--visible-height, 100dvh);
   margin-inline: auto;
   padding: max(8px, var(--safe-top)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + var(--safe-bottom)) max(16px, env(safe-area-inset-left, 0px));
   background-color: var(--background);
@@ -174,7 +184,7 @@ header {
   margin-top: 4px;
   background: linear-gradient(#131411 1px,transparent 1px), linear-gradient(90deg,#131411 1px,transparent 1px), #0b0c0b; background-size: 20px 20px;
 }
-.floorplan { width: 100%; height: clamp(310px, 52dvh, 470px); }
+.floorplan { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hall-links { fill: none; stroke: #69695a; stroke-width: 2; stroke-linejoin: round; }
 .floorplan .room { cursor: pointer; }
 .floorplan .room polygon { stroke-width: 1.3; }
@@ -394,9 +404,47 @@ html[data-motion="on"] [data-enter] .sector-credit {
 .briefing .briefing-card p + p { margin-top: 0; }
 .briefing h1 { font-size: clamp(22px, 7.6vw, 30px); }
 .briefing .primary { font-size: 18px; }
-.app-shell { height: 100vh; height: 100dvh; min-height: 0; }
-.screen-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
+.telegram .app-shell {
+  height: min(var(--tg-viewport-stable-height, 100dvh), var(--visible-height, 100dvh));
+}
+.app-shell { container-type: size; }
+.screen-scroll {
+  grid-area: 2 / 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-bottom: var(--dock-space);
+}
+.screen-scroll::after {
+  content: "";
+  flex: 0 0 var(--dock-space);
+}
+.floating-controls {
+  grid-area: 2 / 1;
+  align-self: end;
+  z-index: 2;
+  pointer-events: none;
+}
+.floating-controls button { pointer-events: auto; }
+.floating-controls .test-controls button {
+  border-radius: 999px;
+  background: var(--background);
+}
 .screen-scroll > .screen { flex: 1 0 auto; }
+.screen-scroll > :is(.briefing, .map-screen) {
+  flex: none;
+  height: calc(100% - var(--dock-space));
+  min-height: min-content;
+}
+.screen-scroll > .briefing { display: grid; grid-template-rows: minmax(100px, 1fr) auto; }
+.briefing .earth { min-height: 0; aspect-ratio: auto; }
+.briefing .briefing-card { flex: none; }
+.screen-scroll > .map-screen { display: grid; grid-template-rows: auto minmax(194px, 1fr) auto; }
+.map-art { position: relative; min-height: 0; }
+.briefing-card h1 { font-size: 26.8125px; }
+.briefing .briefing-card p { font-size: 16.5px; max-width: none; }
 .screen-scroll {
   min-width: 0;
   overflow-x: hidden;
@@ -427,6 +475,20 @@ html[data-motion="on"] [data-enter] .sector-credit {
   width: min(100%, 320px);
   height: 214px;
   overflow: hidden;
+}
+@container (max-height: 730px) {
+  .app-shell header { min-height: 52px; }
+  :is(.instructions, .code-screen) .card { padding: 16px; }
+  :is(.instructions, .code-screen) .guide { gap: 7px; }
+  :is(.instructions, .code-screen) .guide .display { min-height: 48px; }
+  :is(.instructions, .code-screen) .guide p { margin-top: 8px; padding-top: 10px; font-size: 15px; }
+  .guide .avatar { width: 68px; height: 68px; top: 14px; right: 16px; }
+  .instructions-card { gap: 10px; }
+  .instructions-card ol { margin-top: 4px; gap: 9px; }
+  .instructions-card li { font-size: 15px; padding-bottom: 8px; }
+  .code-screen .assignment p { margin-top: 6px; font-size: 16.5px; }
+  .result { min-height: 0; }
+  .result .status-icon { height: clamp(116px, 25cqh, 190px); }
 }
 .result.mission { --mark-color: #ffd45c; }
 .result.confirmed { --mark-color: #75e79a; }

@@ -152,7 +152,7 @@ function codeScreen() {
           <input id="code" name="code" type="text" inputmode="numeric" maxlength="4"
             pattern="[0-9]{4}" autocomplete="off" enterkeyhint="done" required>
         </div>
-        <button class="button primary" type="submit" disabled>Подтвердить</button>
+        <button class="button primary" name="confirm-code" type="submit" disabled>Подтвердить</button>
       </div>
     </form>
   </section>`;
@@ -291,18 +291,29 @@ function bindShortWords(text) {
     .replace(/ +(?=[—·])/gu, '\u00a0');
 }
 
+const dockSize = new ResizeObserver(([entry]) => {
+  if (entry.target.isConnected) measureDock(entry.target);
+});
+
+function measureDock(dock) {
+  dock.parentElement.style.setProperty('--dock-space', dock.offsetHeight + 'px');
+}
+
 function render(animate = true) {
+  dockSize.disconnect();
   app.innerHTML = `<div class="app-shell" data-screen="${screen}" ${animate ? 'data-enter' : ''}>
     <header>${brand}${screen !== 'welcome' && !inTelegram ? button('←', 'back', 'back ghost') : ''}</header>
     <div class="screen-scroll">${views[screen]()}</div>
-    <div class="primary-dock"></div>
-    <div class="test-controls">
-      <button type="button" data-action="restart">Перезагрузить</button>
-    </div>
+    <footer class="floating-controls">
+      <div class="primary-dock"></div>
+      <div class="test-controls"><button type="button" data-action="restart">Перезагрузить</button></div>
+    </footer>
   </div>`;
   const primary = app.querySelector('.screen .button.primary');
-
-  if (primary.type !== 'submit') app.querySelector('.primary-dock').append(primary);
+  if (primary.type === 'submit') primary.setAttribute('form', 'code-form');
+  app.querySelector('.primary-dock').append(primary);
+  const actions = app.querySelector('.screen .actions');
+  if (actions && !actions.childElementCount) actions.remove();
   const words = document.createTreeWalker(app, NodeFilter.SHOW_TEXT);
   while (words.nextNode()) {
     const node = words.currentNode;
@@ -314,6 +325,9 @@ function render(animate = true) {
     else telegram.BackButton.show();
   }
   if (screen === 'code') syncCode();
+  const dock = app.querySelector('.floating-controls');
+  measureDock(dock);
+  dockSize.observe(dock);
 }
 
 function syncCode() {
@@ -329,7 +343,7 @@ function syncCode() {
     digit.textContent = value || '0';
     digit.animate([{ opacity: 0, transform: 'translateY(45%)' }, { opacity: 1, transform: 'none' }], { duration: 150, easing: 'ease-out' });
   });
-  app.querySelector('#code-form button[type="submit"]').disabled = code.length !== 4;
+  field.form.elements.namedItem('confirm-code').disabled = code.length !== 4 || field.readOnly;
 }
 
 function haptic(type) {
@@ -437,12 +451,24 @@ app.addEventListener('submit', event => {
     if (form.classList.contains('rejecting')) return;
     form.classList.add('rejecting');
     form.elements.code.readOnly = true;
-    form.querySelector('button').disabled = true;
+    form.elements.namedItem('confirm-code').disabled = true;
     setTimeout(() => { if (form.isConnected) go('incorrect'); }, 420);
   }
 });
 
+// iOS can resize the visible viewport without resizing the layout viewport.
+function syncViewport() {
+  const viewport = window.visualViewport;
+  if (viewport && viewport.scale === 1) {
+    app.style.setProperty('--visible-height', viewport.height + 'px');
+  } else {
+    app.style.removeProperty('--visible-height');
+  }
+}
+syncViewport();
+window.visualViewport?.addEventListener('resize', syncViewport);
 if (inTelegram) {
+  app.classList.add('telegram');
   telegram.expand();
   if (telegram.isVersionAtLeast?.('6.1')) {
     telegram.BackButton.onClick(back);
