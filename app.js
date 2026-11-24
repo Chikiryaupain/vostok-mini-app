@@ -9,6 +9,7 @@ let progress = load();
 let screen = initialScreen();
 let selected = Math.min(progress.opened, total - 1);
 let code = '';
+let codeScreenHeight = 0;
 
 function load() {
   try {
@@ -63,7 +64,11 @@ function back() {
 const button = (label, action, type = 'primary') =>
   `<button class="button ${type}" type="button" data-action="${action}">${label}</button>`;
 const title = (text, className = '') => `<h1 tabindex="-1" class="${className}">${text}</h1>`;
-const brand = '<img class="brand" src="./assets/brand.png" alt="Arknights Endfield × Музей космонавтики" width="247" height="24">';
+const brand = `<span class="brand" aria-hidden="true">
+  <img src="./assets/Endfield.svg" width="1099" height="183" alt="">
+  <span>×</span>
+  <img src="./assets/museum.svg" width="982" height="221" alt="">
+</span>`;
 const earth = `<div class="earth" aria-hidden="true"></div>`;
 const avatar = '<img class="avatar" src="./assets/avatar.png" width="82" height="82" alt="">';
 
@@ -303,13 +308,13 @@ function revealCodeRow() {
   const input = document.activeElement;
   if (input?.id !== 'code') return;
   const scroll = input.closest('.screen-scroll');
-  const row = input.closest('.code-field').getBoundingClientRect();
+  const card = input.closest('.code-entry').getBoundingClientRect();
   const viewport = window.visualViewport;
-  const top = Math.max(scroll.getBoundingClientRect().top, viewport?.offsetTop ?? 0);
-  const dockTop = app.querySelector('.floating-controls').getBoundingClientRect().top;
-  const bottom = Math.min(dockTop, viewport ? viewport.offsetTop + viewport.height : innerHeight);
-  if (row.bottom > bottom) scroll.scrollTop += Math.ceil(row.bottom - bottom);
-  else if (row.top < top) scroll.scrollTop -= Math.ceil(top - row.top);
+  const bounds = scroll.getBoundingClientRect();
+  const top = Math.max(bounds.top, viewport?.offsetTop ?? 0);
+  const bottom = Math.min(bounds.bottom, viewport ? viewport.offsetTop + viewport.height : innerHeight);
+  if (card.bottom > bottom) scroll.scrollTop += Math.ceil(card.bottom - bottom);
+  else if (card.top < top && card.height <= bottom - top) scroll.scrollTop -= Math.ceil(top - card.top);
 }
 
 const codeViewport = new ResizeObserver(revealCodeRow);
@@ -333,18 +338,17 @@ function render(animate = true) {
   app.innerHTML = `<div class="app-shell" data-screen="${screen}" ${animate ? 'data-enter' : ''}>
     <div class="screen-scroll">
       <header>
-        <button class="brand-restart" type="button" data-action="restart" aria-label="Начать квест заново" title="Начать квест заново">${brand}</button>
+        <button class="brand-restart" type="button" data-action="restart" aria-label="Начать квест заново — Endfield × Музей космонавтики" title="Начать квест заново">${brand}</button>
         ${screen !== 'welcome' && !inTelegram ? button('←', 'back', 'back ghost') : ''}
       </header>
       ${views[screen]()}
     </div>
-    <footer class="floating-controls">
+    ${screen === 'code' ? '' : `<footer class="floating-controls">
       <div class="primary-dock"></div>
-    </footer>
+    </footer>`}
   </div>`;
   const primary = app.querySelector('.screen .button.primary');
-  if (primary.type === 'submit') primary.setAttribute('form', 'code-form');
-  app.querySelector('.primary-dock').append(primary);
+  app.querySelector('.primary-dock')?.append(primary);
   const actions = app.querySelector('.screen .actions');
   if (actions && !actions.childElementCount) actions.remove();
   const words = document.createTreeWalker(app, NodeFilter.SHOW_TEXT);
@@ -357,10 +361,14 @@ function render(animate = true) {
     if (screen === 'welcome') telegram.BackButton.hide();
     else telegram.BackButton.show();
   }
-  if (screen === 'code') syncCode();
   const dock = app.querySelector('.floating-controls');
-  measureDock(dock);
-  dockSize.observe(dock);
+  if (dock) {
+    measureDock(dock);
+    dockSize.observe(dock);
+  } else {
+    codeScreenHeight = app.querySelector('.app-shell').clientHeight;
+    syncCode();
+  }
 }
 
 function syncCode() {
@@ -470,23 +478,43 @@ app.addEventListener('input', event => {
   syncCode();
 });
 
-app.addEventListener('submit', event => {
+function dismissCodeKeyboard(form) {
+  const shell = form.closest('.app-shell');
+  const wasShortened = codeScreenHeight - shell.clientHeight > 80;
+  form.elements.code.blur();
+  if (!wasShortened) return;
+
+  // Some webviews restore a different height when their browser toolbar reappears.
+  return new Promise(resolve => {
+    const deadline = performance.now() + 1000;
+    function checkHeight() {
+      if (!form.isConnected || shell.clientHeight >= codeScreenHeight - 8 || performance.now() >= deadline) resolve();
+      else requestAnimationFrame(checkHeight);
+    }
+    requestAnimationFrame(checkHeight);
+  });
+}
+
+app.addEventListener('submit', async event => {
   if (event.target.id !== 'code-form') return;
   event.preventDefault();
   if (screen !== 'code' || progress.opened >= total || code.length !== 4) return;
-  if (code === quest.sectors[progress.opened].code) {
+  const form = event.target;
+  if (form.elements.code.readOnly) return;
+  const valid = code === quest.sectors[progress.opened].code;
+  const keyboardClosed = dismissCodeKeyboard(form);
+  form.elements.code.readOnly = true;
+  form.elements.namedItem('confirm-code').disabled = true;
+  if (valid) {
     progress.pending = true;
     save();
-    go('confirmed');
   } else {
     haptic('error');
-    const form = event.target;
-    if (form.classList.contains('rejecting')) return;
     form.classList.add('rejecting');
-    form.elements.code.readOnly = true;
-    form.elements.namedItem('confirm-code').disabled = true;
-    setTimeout(() => { if (form.isConnected) go('incorrect'); }, 420);
+    await new Promise(resolve => setTimeout(resolve, 420));
   }
+  await keyboardClosed;
+  if (form.isConnected) go(valid ? 'confirmed' : 'incorrect');
 });
 
 // iOS can resize the visible viewport without resizing the layout viewport.

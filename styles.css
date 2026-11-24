@@ -48,6 +48,7 @@ button { cursor: pointer; touch-action: manipulation; }
 }
 
 .app-shell {
+  --dock-space: 0px;
   position: relative;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
@@ -82,7 +83,16 @@ header {
   border: 0;
   background: transparent;
 }
-.brand { display: block; width: 100%; height: auto; }
+.brand {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1.12fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6%;
+  color: var(--text);
+  font: 400 17px/1 var(--body);
+}
+.brand img { display: block; width: 100%; height: auto; }
 
 .screen { display: flex; flex-direction: column; flex: 1; gap: 14px; min-width: 0; }
 .actions { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -180,9 +190,9 @@ header {
 
 .map-screen { gap: 18px; padding-top: 14px; }
 .map-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.map-title { font-size: 16px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
-.counter { font: 600 26px/1 var(--mono); margin-top: 5px; }
-.counter span { color: var(--muted); font-size: 21px; }
+.map-title { letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.counter { font-family: var(--mono); font-weight: 600; margin-top: 5px; }
+.counter span { color: var(--muted); }
 .map-art {
   display: grid;
   place-items: center;
@@ -215,8 +225,9 @@ header {
 .entrance-text { font: 700 10px var(--mono); letter-spacing: .065em; }
 .entrance-text { fill: #fff; }
 .map-info { padding-top: 5px; }
-.map-info p { font-size: 18px; line-height: 1.25; }
-.map-info .eyebrow { color: #858585; font-weight: 500; font-size: 12px; margin-bottom: 5px; }
+.map-info p, .counter { font-size: 18px; line-height: 1.25; }
+.map-info .eyebrow, .map-title { font-size: 12px; }
+.map-info .eyebrow { color: #858585; font-weight: 500; margin-bottom: 5px; }
 
 .code-form { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .assignment { display: grid; gap: 9px; }
@@ -435,6 +446,15 @@ html[data-motion="on"] [data-enter] .sector-credit {
   pointer-events: none;
 }
 .floating-controls button { pointer-events: auto; }
+.app-shell:is([data-screen="confirmed"], [data-screen="incorrect"]) {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.app-shell:is([data-screen="confirmed"], [data-screen="incorrect"]) .floating-controls {
+  grid-area: 2 / 1;
+}
+.app-shell:is([data-screen="confirmed"], [data-screen="incorrect"]) .screen-scroll::after {
+  content: none;
+}
 .screen-scroll > .screen { flex: 1 0 auto; }
 .screen-scroll > :is(.briefing, .map-screen) {
   flex: 1 0 0;
